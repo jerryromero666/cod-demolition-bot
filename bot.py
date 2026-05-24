@@ -1,79 +1,83 @@
 import os
 import tweepy
-from ntscraper import Nitter
-import time
+import requests
+from bs4 import BeautifulSoup
+import asyncio
+import re
 
-# Safely pulling keys from Render's secure background environment
-API_KEY = os.getenv("API_KEY")
-API_KEY_SECRET = os.getenv("API_KEY_SECRET")
-ACCESS_TOKEN = os.getenv("ACCESS_TOKEN")
-ACCESS_TOKEN_SECRET = os.getenv("ACCESS_TOKEN_SECRET")
+# --- YOUR X API CREDENTIALS ---
+API_KEY = os.getenv("API_KEY", "Qm3sjlEJd9IjmoN56t4TpQMFE")
+API_KEY_SECRET = os.getenv("API_KEY_SECRET", "uMwnMNsn8SIJGJTUKR9nnguCJ4Czy7cz2gRj0Q75oRV6LVvN40")
+ACCESS_TOKEN = os.getenv("ACCESS_TOKEN", "2050297362124615680-wMz2bipzheN5Co6lhppO7vlWiQjxRE")
+ACCESS_TOKEN_SECRET = os.getenv("ACCESS_TOKEN_SECRET", "0GqiX0Qd5Cp73LDaOOdJXdILn4Kd55Mos3RdBr5IIFzWX")
 
-# The target accounts to watch
 TARGET_ACCOUNTS = ["CallofDuty", "Treyarch", "CallofDutyCM"]
-
-# Your custom campaign message
 REPLY_MESSAGE = "Bring DEMOLITION to HARDCORE in BO7 PLEASE!!!! We're still stuck playing Cold War to enjoy HC Demo - there's DOZENS OF US!!!! PLzzzZzzZ <3"
 
-# Dictionary to keep track of the last tweet ID we saw for each user
-# This prevents the bot from replying to the same tweet over and over
 last_seen_tweets = {account: None for account in TARGET_ACCOUNTS}
 
-def create_client():
-    return tweepy.Client(
-        consumer_key=API_KEY,
-        consumer_secret=API_KEY_SECRET,
-        access_token=ACCESS_TOKEN,
-        access_token_secret=ACCESS_TOKEN_SECRET
-    )
-
 def reply_to_tweet(tweet_id):
-    """Sends your specific reply to a target tweet ID."""
     try:
-        client = create_client()
-        # in_reply_to_tweet_id attaches it as a comment under their tweet
+        client = tweepy.Client(
+            consumer_key=API_KEY, consumer_secret=API_KEY_SECRET,
+            access_token=ACCESS_TOKEN, access_token_secret=ACCESS_TOKEN_SECRET
+        )
         response = client.create_tweet(text=REPLY_MESSAGE, in_reply_to_tweet_id=tweet_id)
         print(f" Successfully replied to tweet {tweet_id}!")
     except Exception as e:
         print(f"❌ Failed to send reply: {e}")
 
-def check_for_new_tweets():
-    """Scrapes the targets for new posts without using the paid API."""
-    scraper = Nitter()
+async def check_for_new_tweets():
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    }
     
     for account in TARGET_ACCOUNTS:
         try:
-            print(f"Checking @{account} for new tweets...")
-            # Fetch the single newest tweet from their profile (excluding retweets)
-            tweets = scraper.get_profile_info(account)
-            # Get their latest numeric tweet ID
-            latest_tweets = scraper.get_tweets(account, mode='user', number=1)
+            print(f"Checking @{account}...")
+            # Search Google for the latest index of this specific user's status updates
+            search_url = f"https://www.google.com/search?q=site:x.com/{account}/status/"
+            response = requests.get(search_url, headers=headers, timeout=10)
             
-            if latest_tweets and 'tweets' in latest_tweets and len(latest_tweets['tweets']) > 0:
-                current_tweet = latest_tweets['tweets'][0]
-                tweet_id = current_tweet['tweet_id']
+            if response.status_code == 200:
+                soup = BeautifulSoup(response.text, 'html.parser')
+                # Find all URLs matching an X status ID link
+                links = soup.find_all('a', href=True)
+                tweet_ids = []
                 
-                # If this is the first run, just bookmark their latest tweet so we don't spam old posts
-                if last_seen_tweets[account] is None:
-                    last_seen_tweets[account] = tweet_id
-                    print(f"Bookmarked latest tweet for @{account}: {tweet_id}")
-                    continue
+                for link in links:
+                    href = link['href']
+                    match = re.search(r'x\.com/' + account + r'/status/(\d+)', href)
+                    if match:
+                        tweet_ids.append(match.group(1))
                 
-                # If the ID has changed, they posted something new!
-                if tweet_id != last_seen_tweets[account]:
-                    print(f"🚨 NEW TWEET DETECTED from @{account}!")
-                    last_seen_tweets[account] = tweet_id
-                    reply_to_tweet(tweet_id)
+                if tweet_ids:
+                    # The highest ID or first ID returned represents their latest post
+                    latest_id = max(tweet_ids) 
                     
+                    # First run initialization
+                    if last_seen_tweets[account] is None:
+                        last_seen_tweets[account] = latest_id
+                        print(f"Bookmarked latest tweet for @{account}: {latest_id}")
+                        continue
+                    
+                    # If they dropped a newer tweet id
+                    if int(latest_id) > int(last_seen_tweets[account]):
+                        print(f"🚨 NEW TWEET DETECTED from @{account}!")
+                        last_seen_tweets[account] = latest_id
+                        reply_to_tweet(latest_id)
+            else:
+                print(f"⚠️ Google search query throttled (Status {response.status_code})")
+                
         except Exception as e:
             print(f"Error checking @{account}: {e}")
 
-if __name__ == "__main__":
-    print("🤖 Bot started. Standing by for Call of Duty updates...")
-    
-    # Run forever
+async def main():
+    print("🤖 Campaign Bot active. Monitoring CoD channels...")
     while True:
-        check_for_new_tweets()
-        # Wait 30 seconds before checking again to avoid getting blocked
-        print("Waiting 30 seconds before next check...\n")
-        time.sleep(30)
+        await check_for_new_tweets()
+        print("Waiting 60 seconds before next check...\n")
+        await asyncio.sleep(60)
+
+if __name__ == "__main__":
+    asyncio.run(main())
