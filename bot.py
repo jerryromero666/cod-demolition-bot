@@ -4,12 +4,16 @@ import requests
 from bs4 import BeautifulSoup
 import asyncio
 import re
+from dotenv import load_dotenv  # Tool to read hidden local keys
 
-# --- YOUR X API CREDENTIALS ---
-API_KEY = os.getenv("API_KEY", "Qm3sjlEJd9IjmoN56t4TpQMFE")
-API_KEY_SECRET = os.getenv("API_KEY_SECRET", "uMwnMNsn8SIJGJTUKR9nnguCJ4Czy7cz2gRj0Q75oRV6LVvN40")
-ACCESS_TOKEN = os.getenv("ACCESS_TOKEN", "2050297362124615680-wMz2bipzheN5Co6lhppO7vlWiQjxRE")
-ACCESS_TOKEN_SECRET = os.getenv("ACCESS_TOKEN_SECRET", "0GqiX0Qd5Cp73LDaOOdJXdILn4Kd55Mos3RdBr5IIFzWX")
+# Load local .env file if it exists (for running securely on your PC)
+load_dotenv()
+
+# Safely pulling keys (No hardcoded plaintext keys here anymore!)
+API_KEY = os.getenv("API_KEY")
+API_KEY_SECRET = os.getenv("API_KEY_SECRET")
+ACCESS_TOKEN = os.getenv("ACCESS_TOKEN")
+ACCESS_TOKEN_SECRET = os.getenv("ACCESS_TOKEN_SECRET")
 
 TARGET_ACCOUNTS = ["CallofDuty", "Treyarch", "CallofDutyCM"]
 REPLY_MESSAGE = "Bring DEMOLITION to HARDCORE in BO7 PLEASE!!!! We're still stuck playing Cold War to enjoy HC Demo - there's DOZENS OF US!!!! PLzzzZzzZ <3"
