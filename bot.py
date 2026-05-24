@@ -1,12 +1,13 @@
+import os
 import tweepy
 from ntscraper import Nitter
 import time
 
-# Your working credentials
-API_KEY = "Qm3sjlEJd9IjmoN56t4TpQMFE"
-API_KEY_SECRET = "uMwnMNsn8SIJGJTUKR9nnguCJ4Czy7cz2gRj0Q75oRV6LVvN40"
-ACCESS_TOKEN = "2050297362124615680-wMz2bipzheN5Co6lhppO7vlWiQjxRE"
-ACCESS_TOKEN_SECRET = "0GqiX0Qd5Cp73LDaOOdJXdILn4Kd55Mos3RdBr5IIFzWX"
+# Safely pulling keys from Render's secure background environment
+API_KEY = os.getenv("API_KEY")
+API_KEY_SECRET = os.getenv("API_KEY_SECRET")
+ACCESS_TOKEN = os.getenv("ACCESS_TOKEN")
+ACCESS_TOKEN_SECRET = os.getenv("ACCESS_TOKEN_SECRET")
 
 # The target accounts to watch
 TARGET_ACCOUNTS = ["CallofDuty", "Treyarch", "CallofDutyCM"]
