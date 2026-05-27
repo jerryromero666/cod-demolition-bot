@@ -26,14 +26,17 @@ def reply_to_tweet(tweet_id):
     except Exception as e:
         print(f"❌ Failed to send reply: {e}")
         return False
+
 @app.route('/')
 def home():
     return "Bot is awake!", 200
     
 @app.route('/trigger-reply', methods=['POST'])
 def trigger_reply():
-    data = request.json
-    tweet_url = data.get('tweet_url', '')
+    data = request.json or {}
+    
+    # Looks for 'LinkToTweet' from IFTTT first, then falls back to 'tweet_url'
+    tweet_url = data.get('LinkToTweet', data.get('tweet_url', ''))
     
     # Extract the numerical Tweet ID from the full URL provided by IFTTT
     # Example URL: https://twitter.com/Treyarch/status/181234567890123456
