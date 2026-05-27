@@ -26,7 +26,10 @@ def reply_to_tweet(tweet_id):
     except Exception as e:
         print(f"❌ Failed to send reply: {e}")
         return False
-
+@app.route('/')
+def home():
+    return "Bot is awake!", 200
+    
 @app.route('/trigger-reply', methods=['POST'])
 def trigger_reply():
     data = request.json
