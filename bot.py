@@ -21,7 +21,7 @@ def reply_to_tweet(tweet_id):
             access_token=ACCESS_TOKEN, access_token_secret=ACCESS_TOKEN_SECRET
         )
         response = client.create_tweet(text=REPLY_MESSAGE, in_reply_to_tweet_id=tweet_id)
-        print(f" Successfully replied to tweet {tweet_id}!")
+        print(f" Successfully replied to tweet ID: {tweet_id}!")
         return True
     except Exception as e:
         print(f"❌ Failed to send reply: {e}")
@@ -30,16 +30,23 @@ def reply_to_tweet(tweet_id):
 @app.route('/trigger-reply', methods=['POST'])
 def trigger_reply():
     data = request.json
-    tweet_id = data.get('tweet_id')
+    tweet_url = data.get('tweet_url', '')
     
-    if tweet_id:
-        print(f"🚨 ALERT received! Processing reply for Tweet ID: {tweet_id}")
+    # Extract the numerical Tweet ID from the full URL provided by IFTTT
+    # Example URL: https://twitter.com/Treyarch/status/181234567890123456
+    try:
+        tweet_id = tweet_url.split('/status/')[-1].split('?')[0]
+    except Exception:
+        tweet_id = None
+
+    if tweet_id and tweet_id.isdigit():
+        print(f"🚨 IFTTT ALERT! Processing reply for Tweet ID: {tweet_id}")
         success = reply_to_tweet(tweet_id)
         if success:
             return jsonify({"status": "success"}), 200
         return jsonify({"status": "failed"}), 500
         
-    return jsonify({"status": "error"}), 400
+    return jsonify({"status": "error", "message": "Invalid or missing tweet_url"}), 400
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
