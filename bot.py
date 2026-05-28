@@ -1,25 +1,24 @@
 import os
 import tweepy
+from datetime import datetime
 from flask import Flask, request, jsonify
 from dotenv import load_dotenv
 
 load_dotenv()
 
-# Aggressively strip any hidden newline/space strings that break OAuth validation
 API_KEY = os.getenv("API_KEY", "").strip()
 API_KEY_SECRET = os.getenv("API_KEY_SECRET", "").strip()
 ACCESS_TOKEN = os.getenv("ACCESS_TOKEN", "").strip()
 ACCESS_TOKEN_SECRET = os.getenv("ACCESS_TOKEN_SECRET", "").strip()
 
-REPLY_MESSAGE = "Bring DEMOLITION to HARDCORE in BO7 PLEASE!!!! We're still stuck playing Cold War to enjoy HC Demo - there's DOZENS OF US!!!! PLzzzZzzZ <3"
+BASE_MESSAGE = "Bring DEMOLITION to HARDCORE in BO7 PLEASE!!!! We're still stuck playing Cold War to enjoy HC Demo - there's DOZENS OF US!!!! PLzzzZzzZ <3"
 
 app = Flask(__name__)
 
 def reply_to_tweet(tweet_id, original_url):
     try:
-        # Diagnostic validation to check if key strings are empty or malformed
         if not all([API_KEY, API_KEY_SECRET, ACCESS_TOKEN, ACCESS_TOKEN_SECRET]):
-            raise ValueError("One or more X API environment keys are missing or empty in Render.")
+            raise ValueError("One or more X API environment keys are missing in Render.")
 
         client = tweepy.Client(
             consumer_key=API_KEY,
@@ -28,14 +27,18 @@ def reply_to_tweet(tweet_id, original_url):
             access_token_secret=ACCESS_TOKEN_SECRET
         )
         
-        public_message = f"{REPLY_MESSAGE}\n\nContext: {original_url}"
+        # Create a dynamic timestamp string (Example: "[05/28 12:25 AM]")
+        current_time = datetime.now().strftime("%m/%d %I:%M %p")
+        
+        # Append the timestamp so X never flags it as a back-to-back duplicate post!
+        public_message = f"{BASE_MESSAGE}\n\nContext: {original_url}\n📌 Sent at: {current_time}"
         
         response = client.create_tweet(text=public_message)
-        print(f" Successfully posted public broadcast for tweet ID: {tweet_id}!")
+        print(f" Successfully posted unique public broadcast for tweet ID: {tweet_id}!")
         return True, "Success"
             
     except Exception as e:
-        error_msg = f"X API Authentication or Payload Error: {str(e)}"
+        error_msg = f"X API Error: {str(e)}"
         print(f"❌ {error_msg}")
         return False, error_msg
 
@@ -46,8 +49,6 @@ def home():
 @app.route('/trigger-reply', methods=['POST'])
 def trigger_reply():
     data = request.json or {}
-    
-    # Extract the LinkToTweet payload from IFTTT
     tweet_url = data.get('LinkToTweet', data.get('tweet_url', ''))
     
     try:
@@ -62,7 +63,6 @@ def trigger_reply():
         if success:
             return jsonify({"status": "success"}), 200
         
-        # Free diagnostic feedback: Bubble up the raw error directly to IFTTT's dashboard!
         return jsonify({"status": "failed", "reason": diagnostic_info}), 400
         
     return jsonify({"status": "error", "message": "Invalid or missing tweet_url"}), 400
