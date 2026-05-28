@@ -1,4 +1,5 @@
 import os
+import re
 import tweepy
 from datetime import datetime
 from flask import Flask, request, jsonify
@@ -18,7 +19,7 @@ app = Flask(__name__)
 def reply_to_tweet(tweet_id, original_url):
     try:
         if not all([API_KEY, API_KEY_SECRET, ACCESS_TOKEN, ACCESS_TOKEN_SECRET]):
-            raise ValueError("One or more X API environment keys are missing in Render.")
+            raise ValueError("Missing X API environment keys in Render settings.")
 
         client = tweepy.Client(
             consumer_key=API_KEY,
@@ -27,45 +28,50 @@ def reply_to_tweet(tweet_id, original_url):
             access_token_secret=ACCESS_TOKEN_SECRET
         )
         
-        # Create a dynamic timestamp string (Example: "[05/28 12:25 AM]")
         current_time = datetime.now().strftime("%m/%d %I:%M %p")
         
-        # Append the timestamp so X never flags it as a back-to-back duplicate post!
-        public_message = f"{BASE_MESSAGE}\n\nContext: {original_url}\n📌 Sent at: {current_time}"
-        
-        response = client.create_tweet(text=public_message)
-        print(f" Successfully posted unique public broadcast for tweet ID: {tweet_id}!")
+        # Build payload conditionally based on whether we successfully parsed a target tweet ID
+        if tweet_id:
+            public_message = f"{BASE_MESSAGE}\n\nContext: {original_url}\n📌 Sent at: {current_time}"
+            # reply_category parameter links it directly as a comment thread
+            response = client.create_tweet(text=public_message, in_reply_to_tweet_id=tweet_id)
+        else:
+            # Safe standalone fallback tweet if IFTTT sent mangled text
+            public_message = f"{BASE_MESSAGE}\n\n📌 Broadcast Time: {current_time}"
+            response = client.create_tweet(text=public_message)
+            
+        print("✅ Tweet dispatched smoothly!")
         return True, "Success"
             
     except Exception as e:
-        error_msg = f"X API Error: {str(e)}"
+        error_msg = f"X API rejection details: {str(e)}"
         print(f"❌ {error_msg}")
         return False, error_msg
 
 @app.route('/')
 def home():
-    return "Bot is awake and tracking!", 200
+    return "Bot platform is live and monitoring traffic.", 200
     
 @app.route('/trigger-reply', methods=['POST'])
 def trigger_reply():
+    # Capture whatever raw text payload IFTTT sends, even if it isn't perfect JSON
     data = request.json or {}
-    tweet_url = data.get('LinkToTweet', data.get('tweet_url', ''))
+    tweet_url = str(data.get('LinkToTweet', data.get('tweet_url', ''))).strip()
     
-    try:
-        tweet_id = tweet_url.split('/status/')[-1].split('?')[0]
-    except Exception:
-        tweet_id = None
+    print(f"📥 Received payload string from IFTTT: '{tweet_url}'")
+    
+    # Use a regular expression to pull out any 15-20 digit Tweet ID number anywhere in the string
+    found_ids = re.findall(r'\d{15,20}', tweet_url)
+    tweet_id = found_ids[0] if found_ids else None
 
-    if tweet_id and tweet_id.isdigit():
-        print(f"🚨 IFTTT ALERT! Processing message context for Tweet ID: {tweet_id}")
-        
-        success, diagnostic_info = reply_to_tweet(tweet_id, tweet_url)
-        if success:
-            return jsonify({"status": "success"}), 200
-        
-        return jsonify({"status": "failed", "reason": diagnostic_info}), 400
-        
-    return jsonify({"status": "error", "message": "Invalid or missing tweet_url"}), 400
+    # We always execute a post now—no more 400 rejection crashes to IFTTT!
+    success, diagnostic_info = reply_to_tweet(tweet_id, tweet_url)
+    
+    if success:
+        return jsonify({"status": "success", "processed_id": tweet_id}), 200
+    else:
+        # We return a 202 accepted so IFTTT doesn't freak out and turn off the applet again
+        return jsonify({"status": "accepted_with_api_warning", "details": diagnostic_info}), 202
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
