@@ -14,9 +14,8 @@ REPLY_MESSAGE = "Bring DEMOLITION to HARDCORE in BO7 PLEASE!!!! We're still stuc
 
 app = Flask(__name__)
 
-def reply_to_tweet(tweet_id):
+def reply_to_tweet(tweet_id, original_url):
     try:
-        # Corrected Tweepy Client parameters
         client = tweepy.Client(
             consumer_key=API_KEY,
             consumer_secret=API_KEY_SECRET,
@@ -24,20 +23,13 @@ def reply_to_tweet(tweet_id):
             access_token_secret=ACCESS_TOKEN_SECRET
         )
         
-        # 1. Try a direct threaded reply first
-        try:
-            response = client.create_tweet(text=REPLY_MESSAGE, in_reply_to_tweet_id=tweet_id)
-            print(f" Successfully threaded a reply to tweet ID: {tweet_id}!")
-            return True
-        except tweepy.errors.Forbidden as fe:
-            print(f"⚠️ Threaded reply restricted by X API tier settings: {fe}")
-            print("🔄 Falling back to a public tag mention...")
-            
-            # 2. Fallback: Post a public mention targeting the tweet context to bypass Free Tier restrictions
-            fallback_message = f"Regarding context on tweet {tweet_id}: {REPLY_MESSAGE}"
-            response = client.create_tweet(text=fallback_message)
-            print(f" Successfully posted public mention for tweet ID: {tweet_id}!")
-            return True
+        # Free Tier Workaround: Post a standalone tweet with the link attached
+        # This bypasses the blocked 'in_reply_to_tweet_id' feature while keeping the context tied together!
+        public_message = f"{REPLY_MESSAGE}\n\nContext: {original_url}"
+        
+        response = client.create_tweet(text=public_message)
+        print(f" Successfully posted public broadcast for tweet ID: {tweet_id}!")
+        return True
             
     except Exception as e:
         print(f"❌ Failed to send reply: {e}")
@@ -51,7 +43,7 @@ def home():
 def trigger_reply():
     data = request.json or {}
     
-    # Extract LinkToTweet from IFTTT payload
+    # Extract the LinkToTweet payload from IFTTT
     tweet_url = data.get('LinkToTweet', data.get('tweet_url', ''))
     
     try:
@@ -60,8 +52,10 @@ def trigger_reply():
         tweet_id = None
 
     if tweet_id and tweet_id.isdigit():
-        print(f"🚨 IFTTT ALERT! Processing reply for Tweet ID: {tweet_id}")
-        success = reply_to_tweet(tweet_id)
+        print(f"🚨 IFTTT ALERT! Processing message context for Tweet ID: {tweet_id}")
+        
+        # Pass both the ID and the raw URL down to the tweet handler
+        success = reply_to_tweet(tweet_id, tweet_url)
         if success:
             return jsonify({"status": "success"}), 200
         return jsonify({"status": "failed"}), 500
