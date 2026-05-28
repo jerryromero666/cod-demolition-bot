@@ -16,13 +16,29 @@ app = Flask(__name__)
 
 def reply_to_tweet(tweet_id):
     try:
+        # Corrected Tweepy Client parameters
         client = tweepy.Client(
-            consumer_key=API_KEY, consumer_secret=API_KEY_SECRET,
-            access_token=ACCESS_TOKEN, access_token_secret=ACCESS_TOKEN_SECRET
+            consumer_key=API_KEY,
+            consumer_secret=API_KEY_SECRET,
+            access_token=ACCESS_TOKEN,
+            access_token_secret=ACCESS_TOKEN_SECRET
         )
-        response = client.create_tweet(text=REPLY_MESSAGE, in_reply_to_tweet_id=tweet_id)
-        print(f" Successfully replied to tweet ID: {tweet_id}!")
-        return True
+        
+        # 1. Try a direct threaded reply first
+        try:
+            response = client.create_tweet(text=REPLY_MESSAGE, in_reply_to_tweet_id=tweet_id)
+            print(f" Successfully threaded a reply to tweet ID: {tweet_id}!")
+            return True
+        except tweepy.errors.Forbidden as fe:
+            print(f"⚠️ Threaded reply restricted by X API tier settings: {fe}")
+            print("🔄 Falling back to a public tag mention...")
+            
+            # 2. Fallback: Post a public mention targeting the tweet context to bypass Free Tier restrictions
+            fallback_message = f"Regarding context on tweet {tweet_id}: {REPLY_MESSAGE}"
+            response = client.create_tweet(text=fallback_message)
+            print(f" Successfully posted public mention for tweet ID: {tweet_id}!")
+            return True
+            
     except Exception as e:
         print(f"❌ Failed to send reply: {e}")
         return False
@@ -35,11 +51,9 @@ def home():
 def trigger_reply():
     data = request.json or {}
     
-    # Looks for 'LinkToTweet' from IFTTT first, then falls back to 'tweet_url'
+    # Extract LinkToTweet from IFTTT payload
     tweet_url = data.get('LinkToTweet', data.get('tweet_url', ''))
     
-    # Extract the numerical Tweet ID from the full URL provided by IFTTT
-    # Example URL: https://twitter.com/Treyarch/status/181234567890123456
     try:
         tweet_id = tweet_url.split('/status/')[-1].split('?')[0]
     except Exception:
