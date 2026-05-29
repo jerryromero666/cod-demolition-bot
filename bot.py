@@ -30,17 +30,11 @@ def reply_to_tweet(tweet_id, original_url):
         
         current_time = datetime.now().strftime("%m/%d %I:%M %p")
         
-        # Build payload conditionally based on whether we successfully parsed a target tweet ID
-        if tweet_id:
-            public_message = f"{BASE_MESSAGE}\n\nContext: {original_url}\n📌 Sent at: {current_time}"
-            # reply_category parameter links it directly as a comment thread
-            response = client.create_tweet(text=public_message, in_reply_to_tweet_id=tweet_id)
-        else:
-            # Safe standalone fallback tweet if IFTTT sent mangled text
-            public_message = f"{BASE_MESSAGE}\n\n📌 Broadcast Time: {current_time}"
-            response = client.create_tweet(text=public_message)
+        # We switch to a standalone public tweet to bypass strict reply blocks!
+        public_message = f"{BASE_MESSAGE}\n\nContext: {original_url}\n📌 Sent at: {current_time}"
+        response = client.create_tweet(text=public_message)
             
-        print("✅ Tweet dispatched smoothly!")
+        print("✅ Tweet publicly broadcasted successfully!")
         return True, "Success"
             
     except Exception as e:
