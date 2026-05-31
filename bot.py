@@ -2,7 +2,6 @@ import os
 import re
 import random
 import tweepy
-from datetime import datetime
 from flask import Flask, request, jsonify
 from dotenv import load_dotenv
 
@@ -35,10 +34,10 @@ def reply_to_tweet(tweet_id, original_url):
         ]
         chosen_suffix = random.choice(variations)
         
-        # We explicitly tag the devs here so they see it, while replying to the user thread
+        # Explicit dev handles are at the front. It attaches directly to the community tweet thread!
         public_message = f"@CallofDuty @Treyarch @CallofDutyCM Bring DEMOLITION to HARDCORE in BO7 PLEASE!!!! We're still stuck playing Cold War to enjoy HC Demo - there's DOZENS OF US!!!!{chosen_suffix}"
         
-        # Passing 'in_reply_to_tweet_id' attaches it as a genuine, native reply card!
+        # Passing 'in_reply_to_tweet_id' attaches it as a genuine, native reply card underneath the tweet
         response = client.create_tweet(
             text=public_message,
             in_reply_to_tweet_id=tweet_id
@@ -46,11 +45,6 @@ def reply_to_tweet(tweet_id, original_url):
             
         print(f"✅ Real threaded reply attached successfully to ID: {tweet_id}!")
         return True, "Success"
-            
-    except Exception as e:
-        error_msg = f"X API rejection details: {str(e)}"
-        print(f"❌ {error_msg}")
-        return False, error_msg
             
     except Exception as e:
         error_msg = f"X API rejection details: {str(e)}"
@@ -71,11 +65,17 @@ def trigger_reply():
     found_ids = re.findall(r'\d{15,20}', tweet_url)
     tweet_id = found_ids[0] if found_ids else None
 
-    success, diagnostic_info = reply_to_tweet(tweet_id, tweet_url)
+    # Only attempt to tweet if an ID was successfully extracted from IFTTT
+    if tweet_id:
+        success, diagnostic_info = reply_to_tweet(tweet_id, tweet_url)
+    else:
+        success, diagnostic_info = False, "No valid Tweet ID found in incoming payload."
+        print(f"⚠️ {diagnostic_info}")
     
     if success:
         return jsonify({"status": "success", "processed_id": tweet_id}), 200
     else:
+        # Returns a 202 accepted warning so IFTTT doesn't automatically turn off your applet
         return jsonify({"status": "accepted_with_api_warning", "details": diagnostic_info}), 202
 
 if __name__ == "__main__":
