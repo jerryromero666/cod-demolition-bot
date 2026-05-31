@@ -34,17 +34,29 @@ def reply_to_tweet(tweet_id, original_url):
         ]
         chosen_suffix = random.choice(variations)
         
-        # Explicit dev handles are at the front. It attaches directly to the community tweet thread!
-        public_message = f"@CallofDuty @Treyarch @CallofDutyCM Bring DEMOLITION to HARDCORE in BO7 PLEASE!!!! We're still stuck playing Cold War to enjoy HC Demo - there's DOZENS OF US!!!!{chosen_suffix}"
+        # We explicitly tag the core targets so they get notified regardless of layout
+        public_message = f"@CallofDuty @Treyarch @CallofDutyCM @MaTtKs @Activision @CODUpdates @ATVI_AB Bring DEMOLITION to HARDCORE in BO7 PLEASE!!!! We're still stuck playing Cold War to enjoy HC Demo - there's DOZENS OF US!!!!{chosen_suffix}"
         
-        # Passing 'in_reply_to_tweet_id' attaches it as a genuine, native reply card underneath the tweet
-        response = client.create_tweet(
-            text=public_message,
-            in_reply_to_tweet_id=tweet_id
-        )
+        try:
+            # STRATEGY A: Attempt a genuine, native threaded reply card underneath their tweet
+            response = client.create_tweet(
+                text=public_message,
+                in_reply_to_tweet_id=tweet_id
+            )
+            print(f"✅ True inline threaded reply sent successfully to ID: {tweet_id}!")
+            return True, "Success (Threaded Reply)"
             
-        print(f"✅ Real threaded reply attached successfully to ID: {tweet_id}!")
-        return True, "Success"
+        except tweepy.TweepyException as e:
+            # If X throws a 403 because their conversation replies are locked, fallback immediately
+            if "403" in str(e) or "conversation" in str(e).lower():
+                print("⚠️ Conversation locked by author. Switching to STRATEGY B (Public Mention)...")
+                
+                # Strip the URL link component from the text completely to keep it a clean text-only timeline post
+                response = client.create_tweet(text=public_message)
+                print("✅ Public campaign mention broadcasted successfully to their notification feeds!")
+                return True, "Success (Public Mention Fallback)"
+            else:
+                raise e # Pass any other error (like billing/credits) to the main exception block
             
     except Exception as e:
         error_msg = f"X API rejection details: {str(e)}"
@@ -65,7 +77,6 @@ def trigger_reply():
     found_ids = re.findall(r'\d{15,20}', tweet_url)
     tweet_id = found_ids[0] if found_ids else None
 
-    # Only attempt to tweet if an ID was successfully extracted from IFTTT
     if tweet_id:
         success, diagnostic_info = reply_to_tweet(tweet_id, tweet_url)
     else:
@@ -73,9 +84,8 @@ def trigger_reply():
         print(f"⚠️ {diagnostic_info}")
     
     if success:
-        return jsonify({"status": "success", "processed_id": tweet_id}), 200
+        return jsonify({"status": "success", "processed_id": tweet_id, "mode": diagnostic_info}), 200
     else:
-        # Returns a 202 accepted warning so IFTTT doesn't automatically turn off your applet
         return jsonify({"status": "accepted_with_api_warning", "details": diagnostic_info}), 202
 
 if __name__ == "__main__":
