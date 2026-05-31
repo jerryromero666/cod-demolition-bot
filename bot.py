@@ -27,7 +27,7 @@ def reply_to_tweet(tweet_id, original_url):
             access_token_secret=ACCESS_TOKEN_SECRET
         )
         
-        # A pool of subtle variations to bypass the identical/duplicate tweet filter cleanly
+        # Suffix variations to bypass identical tweet spam filters
         variations = [
             " <3", " <3!", " <3 !!", " <3 :)", 
             " plzzzz.", " PLZ!", "!!! <3", " <3 ...",
@@ -35,15 +35,22 @@ def reply_to_tweet(tweet_id, original_url):
         ]
         chosen_suffix = random.choice(variations)
         
-        # Clean base text with absolutely no timestamps or URL link components
-        clean_base = "Bring DEMOLITION to HARDCORE in BO7 PLEASE!!!! We're still stuck playing Cold War to enjoy HC Demo - there's DOZENS OF US!!!!"
-        public_message = f"{clean_base}{chosen_suffix}"
+        # We explicitly tag the devs here so they see it, while replying to the user thread
+        public_message = f"@CallofDuty @Treyarch @CallofDutyCM Bring DEMOLITION to HARDCORE in BO7 PLEASE!!!! We're still stuck playing Cold War to enjoy HC Demo - there's DOZENS OF US!!!!{chosen_suffix}"
         
-        # Directly dispatch a normal timeline post (removes the quote-tweet look)
-        response = client.create_tweet(text=public_message)
+        # Passing 'in_reply_to_tweet_id' attaches it as a genuine, native reply card!
+        response = client.create_tweet(
+            text=public_message,
+            in_reply_to_tweet_id=tweet_id
+        )
             
-        print("✅ Clean text-only tweet broadcasted successfully!")
+        print(f"✅ Real threaded reply attached successfully to ID: {tweet_id}!")
         return True, "Success"
+            
+    except Exception as e:
+        error_msg = f"X API rejection details: {str(e)}"
+        print(f"❌ {error_msg}")
+        return False, error_msg
             
     except Exception as e:
         error_msg = f"X API rejection details: {str(e)}"
